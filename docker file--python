@@ -1,0 +1,37 @@
+# Stage 1: Build stage - install dependencies
+FROM python:3.11-slim AS build
+
+# Set working directory
+WORKDIR /app
+
+# Install build dependencies for any packages that need compilation
+RUN apt-get update && apt-get install -y build-essential
+
+# Copy only requirements file first (for caching)
+COPY requirements.txt .
+
+# Install dependencies into a local folder (to isolate)
+RUN pip install --user -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Stage 2: Runtime stage - minimal image with app and dependencies
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy installed packages from build stage (pip installs to /root/.local by default)
+COPY --from=build /root/.local /root/.local
+
+# Copy application code
+COPY --from=build /app /app
+
+# Add local pip binaries to PATH
+ENV PATH=/root/.local/bin:$PATH
+
+# Expose port if your app listens on one (optional)
+EXPOSE 8000
+
+# Run your Python app
+CMD ["python", "app.py"]
