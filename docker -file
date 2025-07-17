@@ -1,0 +1,202 @@
+
+@@@@@@@@@@@@@@@@@@@@@@@@@Java based application-----maven--pom.xml------------------------@@@@@@@@@@@@@@@@@@@@@@@@@
+project-1
+  multistage
+1.FROM base image AS build
+2.WORKDIR /app
+3.COPY pom.xml .
+  
+4.RUN mvn dependency:go-offline(offine---It pre-downloads all project dependencies (including plugins, parent poms, etc.) so that future builds can run without needing internet access.)
+
+5.COPY src ./src
+6.RUN mvn clean package -DskipTests------------------(-DskipTests is not written in normal running ci/cd, b/c Tells Maven to skip running unit/integration tests during the build process)
+                                                     #use COPY . . to copy everything including the pom.xml and src/, but that’s inefficient. By separating the COPY of the pom.xml, 
+                                     #I can cache Maven dependencies and avoid re-downloading them unless they change. This dramatically speeds up the build process and is considered a best practice in Docker for Java projects.”
+
+7.stage2
+FROM tomcat:9.0.54-jdk11-openjdk-slim--------------sets the base image for this stage- where you run the image or platform to run the image
+                                                #here not req for workdir /app in stage2 b/c tomcat by defalut runs here
+          
+8.COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/
+
+9.EXPOSE 8080
+10.CMD ["catalina.sh", "run"]   # command to start and run the -----catalina.sh--by default tomcat server has to run it ---script
+_____________________________________________________________________________________________________________
+
+project-2 
+# Stage 1: Build environment
+FROM maven:3.8.4-openjdk-11-slim AS build
+
+WORKDIR /app
+
+# Copy only the pom.xml to cache dependencies
+COPY pom.xml .
+
+# Fetch dependencies
+RUN mvn dependency:go-offline
+
+# Copy the source code and build application
+COPY src ./src
+RUN mvn package -DskipTests
+
+# Stage 2: Runtime environment
+FROM tomcat:9-jre11-slim
+
+WORKDIR /usr/local/tomcat
+
+# Copy the WAR file from the build stage
+COPY --from=build /app/target/java-hello-world.war webapps/
+
+# Add external dependencies
+COPY config/application.properties conf/
+
+# Expose application port
+EXPOSE 8080
+
+# Command to run the application
+CMD ["catalina.sh", "run"]
+_____________________________________________________________
+project 2-2:
+# Stage 1: Build environment
+FROM maven:3.8.4-openjdk-11-slim AS build
+
+ARG APP_ENV
+ENV APP_ENV=${APP_ENV}
+
+WORKDIR /app
+
+# Copy only the pom.xml to cache dependencies
+COPY pom.xml .
+
+# Fetch dependencies
+RUN mvn dependency:go-offline
+
+# Copy the source code and build application
+COPY src ./src
+RUN mvn package -DskipTests -Dapp.env=$APP_ENV
+
+# Stage 2: Runtime environment
+FROM tomcat:9-jre11-slim
+
+ARG APP_ENV
+ENV APP_ENV=${APP_ENV}
+
+WORKDIR /usr/local/tomcat
+
+# Copy the WAR file from the build stage
+COPY --from=build /app/target/java-hello-world.war webapps/
+
+# Add external dependencies
+COPY config/application-${APP_ENV}.properties conf/application.properties
+
+# Expose application port
+EXPOSE 8080
+
+# Command to run the application
+CMD ["catalina.sh", "run"]
+
+
+_________________________________________________________________________________________________________
+project-3
+# Stage 1: Build stage with Maven
+1.FROM maven:3.8.4-openjdk-11-slim AS build
+2.WORKDIR /app
+3.COPY pom.xml .
+4.RUN mvn dependency:go-offline
+
+# Copying src, compiling and building the application
+5.COPY src ./src
+6.RUN mvn clean package -DskipTests
+
+# Stage 2: Final stage with minimal base image
+7.FROM adoptopenjdk:11-jre-hotspot-focal AS runtime
+8.WORKDIR /app
+9.COPY --from=build /app/target/java-hello-world.war ./app.war
+
+# Expose the default port for Tomcat
+10.EXPOSE 8080
+
+# Start the application
+11.CMD ["java", "-jar", "./app.war"]
+___________________________________________________________________________
+project-4:
+# Stage 1: Build environment with Maven
+FROM maven:3.8.4-openjdk-11-slim AS build
+
+WORKDIR /app
+
+# Copy only the pom.xml to cache dependencies
+COPY pom.xml .
+
+# Fetch dependencies
+RUN mvn dependency:go-offline
+
+# Copy the source code
+COPY src ./src
+
+# Build the application
+RUN mvn package -DskipTests
+
+# Stage 2: Runtime environment with Tomcat
+FROM tomcat:9.0.59-jdk11-openjdk-slim
+
+# Create necessary directories
+RUN mkdir -p /usr/local/tomcat/conf/myapp
+
+# Copy external configuration files
+COPY config/application.properties /app/application.properties
+
+# Copy the built WAR file into Tomcat webapps directory
+COPY --from=build /app/target/java-hello-world.war /usr/local/tomcat/webapps/
+
+# Expose default Tomcat port
+EXPOSE 8080
+
+# Start Tomcat
+CMD ["catalina.sh", "run"]
+
+
+
+
+
+
+
+_______________________________________________________________________________________________________________
+project-5
+multistage
+# Stage 1: Build environment
+1.FROM maven:3.8.4-openjdk-11-slim AS build
+
+2.WORKDIR /app
+
+# Copy only the pom.xml to cache dependencies
+3.COPY pom.xml .
+
+# Fetch dependencies
+4.RUN mvn dependency:go-offline
+
+# Copy the source code and build the application
+5.COPY src ./src
+6.RUN mvn clean package -DskipTests
+
+# Stage 2: Runtime environment
+7.FROM tomcat:9.0.54-jdk11-openjdk-slim
+
+# Create a group and user
+8.RUN groupadd -r mygroup && useradd -r -g mygroup myuser
+
+# Set the working directory and change the ownership to the new user
+9.WORKDIR /usr/local/tomcat
+10.RUN chown -R myuser:mygroup /usr/local/tomcat
+
+# Switch to the non-root user
+11.USER myuser
+
+# Copy the built WAR file from the build stage to the webapps directory of Tomcat
+12.COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/
+
+# Expose the default port for Tomcat
+13.EXPOSE 8080
+
+# Start Tomcat server
+14.CMD ["catalina.sh", "run"]
