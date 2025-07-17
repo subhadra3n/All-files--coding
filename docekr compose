@@ -1,0 +1,104 @@
+1. Docker Compose for Java WAR (Tomcat)
+Assuming your multi-stage Dockerfile builds a WAR and uses the official Tomcat image in Stage 2.
+  version: "3.8"
+
+services:
+  webapp:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=jdbc:mysql://db:3306/mydb
+      - DATABASE_USERNAME=user
+      - DATABASE_PASSWORD=password
+    restart: unless-stopped
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
+____________________________________________________________________
+  2.Docker Compose for Java JAR (Spring Boot or similar)
+  If your app is a fat JAR runnable with java -jar app.jar (built with Maven or Gradle).
+  version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/mydb
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+    restart: unless-stopped
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
+app builds your JAR image and runs java -jar.
+
+Passes Spring datasource variables for DB connection.
+
+Also depends on MySQL container.
+
+Key points:
+Both examples include a db MySQL service with persistent volume.
+
+Use environment variables to configure your app’s DB connection.
+
+depends_on ensures DB starts before the app (but doesn’t wait for readiness).
+
+You can expand with healthchecks, networks, and more for production readiness.
+  _________________________
+3.python
+  simple Docker Compose file to run the multi-stage Python app we discussed, assuming the app listens on port 8000.
+
+version: "3.8"
+
+services:
+  python-app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=production
+      - DEBUG=0
+    volumes:
+      - .:/app
+    restart: unless-stopped
+build: . — Builds the Docker image using the Dockerfile in the current directory.
+
+ports — Maps container port 8000 to host port 8000.
+
+environment — Passes environment variables to the container (customize as needed).
+
+volumes — Mounts the current directory inside the container at /app (useful for development, optional in production).
+
+restart — Restarts the container automatically unless stopped.
+__________________________________________________
