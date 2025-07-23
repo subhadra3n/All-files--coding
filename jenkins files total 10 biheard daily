@@ -1,0 +1,22 @@
+sh 'mvn clean install'-----------it will build code, package and install repo-all word it will do
+1.parallel stage of execute for security tools in devops
+stage('Parallel Build and Test') {
+    parallel {
+        stage('Build') {
+            steps {
+                // Build steps
+            }
+        }
+        stage('Unit Tests') {
+            steps {
+                // Unit test steps
+            }
+        }
+        stage('Integration Tests') {
+            steps {
+                // Integration test steps
+            }
+        }
+    }
+}
+2.Environment variable scenario
